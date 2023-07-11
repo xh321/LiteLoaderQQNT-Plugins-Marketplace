@@ -1,4 +1,4 @@
-# LiteLoaderQQNT-Plugin-Template
+# LiteLoaderQQNT-Plugins_Marketplace
 
 LiteLoaderQQNT内置插件，LiteLoaderQQNT的插件市场
 

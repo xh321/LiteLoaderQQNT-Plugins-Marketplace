@@ -1,10 +1,6 @@
 // 运行在 Electron 主进程 下的插件入口
-const { unzip } = require("./unzip.js")
 const { ipcMain } = require("electron");
 const fs = require("fs");
-const zlib = require("zlib");
-const https = require("https");
-
 
 
 const default_config = {
@@ -28,13 +24,6 @@ const default_config = {
 
 // 加载插件时触发
 function onLoad(plugin, liteloader) {
-    const path = "/home/mojinran/Downloads/wallhaven-j3m8y5_3840x2160.png";
-    const zip = zlib.createDeflate();
-    const readStream = fs.createReadStream(path);
-    const writeStream = fs.createWriteStream(`${liteloader.path.plugins}/aaa.zip`);
-    readStream.pipe(zip).pipe(writeStream);
-
-
     ipcMain.handle(
         "LiteLoader.plugins_marketplace.getConfig",
         (event, message) => {
@@ -75,9 +64,6 @@ function onLoad(plugin, liteloader) {
     ipcMain.handle(
         "LiteLoader.plugins_marketplace.install",
         async (event, info) => {
-            const path = "/home/mojinran/Downloads/linux-qqnt-background-blur-main.zip";
-            unzip(path, liteloader.path.plugins);
-
             // // 下载插件并解压
             // const url = `https://codeload.github.com/${info.repo}/zip/refs/heads/${info.branch}`;
             // const request = https.get(url);
@@ -87,10 +73,6 @@ function onLoad(plugin, liteloader) {
             //     response.on("data", chunk => chunks.push(chunk));
             //     response.on("end", () => console.log(Buffer.concat(chunks)));
             // });
-
-            // const path = "/home/mojinran/Downloads/linux-qqnt-background-blur-main.zip";
-            // const data = fs.readFileSync(path, "binary");
-            // console.log(Buffer.from(data));
         }
     );
 }

@@ -1,0 +1,5 @@
+{
+    "dependencies": {
+        "node-stream-zip": "^1.15.0"
+    }
+}

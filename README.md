@@ -1,4 +1,4 @@
-# LiteLoaderQQNT-Plugins_Marketplace
+# LiteLoaderQQNT-Plugins-Marketplace
 
 LiteLoaderQQNT内置插件，LiteLoaderQQNT的插件市场
 

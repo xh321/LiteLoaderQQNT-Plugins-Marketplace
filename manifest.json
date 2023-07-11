@@ -1,9 +1,9 @@
 {
     "manifest_version": 1,
-    "type": "extension",
-    "name": "插件模板",
-    "slug": "plugin_template",
-    "description": "LiteLoaderQQNT的插件模板",
+    "type": "core",
+    "name": "LiteLoader 插件市场",
+    "slug": "plugins_marketplace",
+    "description": "LiteLoaderQQNT的插件市场",
     "version": "0.1.0",
     "author": [
         {

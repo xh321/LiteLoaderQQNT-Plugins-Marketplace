@@ -1,10 +1,30 @@
 // 运行在 Electron 主进程 下的插件入口
-const { ipcMain } = require("electron");
+const { ipcMain, app } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
 const https = require("https");
 const StreamZip = require("node-stream-zip");
+
+
+// 默认配置
+const default_config = {
+    "mirrorlist": [
+        "https://ghproxy.com/https://raw.githubusercontent.com/mo-jinran/LiteLoaderQQNT-Plugin-List/main/list.json"
+    ],
+    "plugin_type": [
+        "all",
+        "current"
+    ],
+    "sort_order": [
+        "random",
+        "forward"
+    ],
+    "list_style": [
+        "single",
+        "loose"
+    ]
+}
 
 
 // 简易的GET请求函数
@@ -35,25 +55,6 @@ function request(url) {
             });
         });
     });
-}
-
-
-const default_config = {
-    "mirrorlist": [
-        "https://ghproxy.com/https://raw.githubusercontent.com/mo-jinran/LiteLoaderQQNT-Plugin-List/main/list.json"
-    ],
-    "plugin_type": [
-        "all",
-        "current"
-    ],
-    "sort_order": [
-        "random",
-        "forward"
-    ],
-    "list_style": [
-        "single",
-        "loose"
-    ]
 }
 
 
@@ -91,25 +92,78 @@ function setConfig(liteloader, new_config) {
 
 
 async function install(liteloader, info) {
-    // 下载插件
-    const url = `https://codeload.github.com/${info.repo}/zip/refs/heads/${info.branch}`;
-    const { isRedirect, body } = await request(url);
+    try {
+        // 下载插件
+        const url = `https://codeload.github.com/${info.repo}/zip/refs/heads/${info.branch}`;
+        const { isRedirect, body } = await request(url);
 
-    // 如果需要跳转
-    if (isRedirect) {
-        return;
+        // 如果需要跳转
+        if (isRedirect) {
+            return;
+        }
+
+        // 保存插件压缩包
+        const cache_path = path.join(liteloader.path.plugins_cache, "plugins_marketplace");
+        const cache_file_path = path.join(cache_path, `${info.repo.split("/")[1]}.zip`);
+        fs.mkdirSync(cache_path, { recursive: true });
+        fs.writeFileSync(cache_file_path, body);
+
+        // 解压并安装插件
+        const zip = new StreamZip.async({ file: cache_file_path });
+        await zip.extract(null, liteloader.path.plugins);
+        await zip.close();
     }
 
-    // 保存插件压缩包
-    const cache_path = path.join(liteloader.path.plugins_cache, "plugins_marketplace");
-    const cache_file_path = path.join(cache_path, `${info.repo.split("/")[1]}.zip`);
-    fs.mkdirSync(cache_path, { recursive: true });
-    fs.writeFileSync(cache_file_path, body);
+    // 失败返回false
+    catch {
+        return false;
+    }
 
-    // 解压并安装插件
-    const zip = new StreamZip.async({ file: cache_file_path });
-    await zip.extract(null, liteloader.path.plugins);
-    await zip.close();
+    // 成功返回true
+    return true;
+}
+
+
+async function uninstall(liteloader, slug, update_mode = false) {
+    const paths = liteloader.plugins?.[slug]?.path;
+
+    // 没有返回false
+    if (!paths) {
+        return false;
+    }
+
+    // 更新模式只删除插件本体
+    if (update_mode) {
+        fs.rmSync(paths.plugin, { recursive: true, force: true });
+        return true;
+    }
+
+    // 删除插件的目录
+    for (const [name, path] of Object.entries(paths)) {
+        fs.rmSync(path, { recursive: true, force: true });
+    }
+
+    // 成功返回true
+    return true;
+}
+
+
+async function update(liteloader, info, slug) {
+    const uninstall_status_is_ok = await uninstall(liteloader, slug, true);
+    if (!uninstall_status_is_ok) {
+        return false;
+    }
+    const install_status_is_ok = await install(liteloader, info);
+    if (!install_status_is_ok) {
+        return false;
+    }
+    return true;
+}
+
+
+async function restart() {
+    app.relaunch();
+    app.exit(0);
 }
 
 
@@ -117,22 +171,36 @@ async function install(liteloader, info) {
 function onLoad(plugin, liteloader) {
     ipcMain.handle(
         "LiteLoader.plugins_marketplace.getConfig",
-        (event, message) => getConfig(liteloader)
+        (event, ...message) => getConfig(liteloader, ...message)
     );
 
     ipcMain.handle(
         "LiteLoader.plugins_marketplace.setConfig",
-        (event, message) => setConfig(liteloader, message)
+        (event, ...message) => setConfig(liteloader, ...message)
     );
 
     ipcMain.handle(
         "LiteLoader.plugins_marketplace.install",
-        (event, message) => install(liteloader, message)
+        (event, ...message) => install(liteloader, ...message)
+    );
+
+    ipcMain.handle(
+        "LiteLoader.plugins_marketplace.uninstall",
+        (event, ...message) => uninstall(liteloader, ...message)
+    );
+
+    ipcMain.handle(
+        "LiteLoader.plugins_marketplace.update",
+        (event, ...message) => update(liteloader, ...message)
+    );
+
+    ipcMain.handle(
+        "LiteLoader.plugins_marketplace.restart",
+        (event, ...message) => restart()
     );
 }
 
 
-// 这两个函数都是可选的
 module.exports = {
     onLoad
 }

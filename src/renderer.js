@@ -11,14 +11,37 @@ platform_map.set("linux", "Linux");
 platform_map.set("darwin", "MacOS");
 
 
+// 对比本地与远端的版本号，有新版就返回true
+function compareVersion(local_version, remote_version) {
+    // 将字符串改为数组
+    const local_version_arr = local_version.trim().split(".");
+    const remote_version_arr = remote_version.trim().split(".");
+    // 返回数组长度最大的
+    const max_length = Math.max(local_version_arr.length, remote_version_arr.length);
+    // 从头对比每一个
+    for (let i = 0; i < max_length; i++) {
+        // 将字符串改为数字
+        const local_version_num = parseInt(local_version_arr?.[i] ?? "0");
+        const remote_version_num = parseInt(remote_version_arr?.[i] ?? "0");
+        // 版本号不相等
+        if (local_version_num != remote_version_num) {
+            // 有更新返回true，没更新返回false
+            return local_version_num < remote_version_num;
+        }
+    }
+    // 版本号相等，返回false
+    return false;
+}
+
+
 // 一个插件列表-插件条目生成函数
 function createPluginItem() {
     const parser = new DOMParser();
-    return (manifest, details, install) => {
+    return (manifest, details, install, uninstall, update, restart) => {
         const temp = `
         <div class="wrap" data-plugin-type="${manifest.type}">
             <div class="vertical-list-item">
-                <img src="${manifest?.thumbnail}" class="thumbnail">
+                <img src="${manifest?.thumbnail ?? ""}" class="thumbnail">
                 <div class="info">
                     <h2 class="name">${manifest.name}</h2>
                     <p class="secondary-text description">${manifest.description}</p>
@@ -26,6 +49,9 @@ function createPluginItem() {
                 <div class="ops-btns">
                     <button class="q-button q-button--small q-button--secondary details">详情</button>
                     <button class="q-button q-button--small q-button--secondary install">安装</button>
+                    <button class="q-button q-button--small q-button--secondary uninstall">卸载</button>
+                    <button class="q-button q-button--small q-button--secondary update">更新</button>
+                    <button class="q-button q-button--small q-button--secondary restart">重启</button>
                 </div>
             </div>
             <hr class="horizontal-dividing-line" />
@@ -42,8 +68,33 @@ function createPluginItem() {
         </div>
         `;
         const doc = parser.parseFromString(temp, "text/html");
-        doc.querySelector(".details").addEventListener("click", details);
-        doc.querySelector(".install").addEventListener("click", install);
+
+        // 获取按钮
+        const details_btn = doc.querySelector(".details");
+        const install_btn = doc.querySelector(".install");
+        const uninstall_btn = doc.querySelector(".uninstall");
+        const update_btn = doc.querySelector(".update");
+        const restart_btn = doc.querySelector(".restart");
+
+        // 初始化按钮功能
+        details_btn.addEventListener("click", details);
+        install_btn.addEventListener("click", install);
+        uninstall_btn.addEventListener("click", uninstall);
+        update_btn.addEventListener("click", update);
+        restart_btn.addEventListener("click", restart);
+
+        // 获取插件状态
+        const local_version = LiteLoader.plugins[manifest.slug]?.manifest?.version ?? "";
+        const remote_version = manifest.version;
+        const is_installed = manifest.slug in LiteLoader.plugins;
+        const is_updated = !compareVersion(local_version, remote_version);
+
+        // 初始化按钮显示
+        install_btn.classList.toggle("hidden", is_installed);
+        uninstall_btn.classList.toggle("hidden", !(is_installed && is_updated));
+        update_btn.classList.toggle("hidden", !(is_installed && !is_updated));
+        restart_btn.classList.toggle("hidden", true);
+
         return doc.querySelector(".wrap");
     }
 }
@@ -86,8 +137,45 @@ async function initPluginList(view) {
             // 详情
             async () => open(`https://github.com/${info.repo}/tree/${info.branch}`),
             // 安装
-            async () => plugins_marketplace.install(info)
+            async event => {
+                event.target.disabled = true;
+                const status_is_ok = await plugins_marketplace.install(info);
+                if (status_is_ok) {
+                    event.target.classList.toggle("hidden", true);
+                    const parentNode = event.target.parentNode;
+                    parentNode.querySelector(".restart").classList.toggle("hidden", false);
+                }
+                event.target.disabled = false;
+            },
+            // 卸载
+            async event => {
+                event.target.disabled = true;
+                const status_is_ok = await plugins_marketplace.uninstall(manifest.slug);
+                if (status_is_ok) {
+                    event.target.classList.toggle("hidden", true);
+                    const parentNode = event.target.parentNode;
+                    parentNode.querySelector(".restart").classList.toggle("hidden", false);
+                }
+                event.target.disabled = false;
+            },
+            // 更新
+            async event => {
+                event.target.disabled = true;
+                const status_is_ok = await plugins_marketplace.update(info, manifest.slug);
+                if (status_is_ok) {
+                    event.target.classList.toggle("hidden", true);
+                    const parentNode = event.target.parentNode;
+                    parentNode.querySelector(".restart").classList.toggle("hidden", false);
+                }
+                event.target.disabled = false;
+            },
+            // 重启
+            async event => {
+                event.target.disabled = true;
+                await plugins_marketplace.restart();
+            }
         );
+
         fragment.appendChild(plugin_item);
     }
 

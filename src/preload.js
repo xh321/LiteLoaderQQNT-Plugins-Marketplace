@@ -15,4 +15,15 @@ contextBridge.exposeInMainWorld("plugins_marketplace", {
         "LiteLoader.plugins_marketplace.install",
         info
     ),
+    uninstall: slug => ipcRenderer.invoke(
+        "LiteLoader.plugins_marketplace.uninstall",
+        slug
+    ),
+    update: (info, slug) => ipcRenderer.invoke(
+        "LiteLoader.plugins_marketplace.update",
+        info, slug
+    ),
+    restart: () => ipcRenderer.invoke(
+        "LiteLoader.plugins_marketplace.restart"
+    )
 });

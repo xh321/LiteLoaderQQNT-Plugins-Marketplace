@@ -40,39 +40,9 @@
 }
 
 /* 选择框容器 */
-.plugins_marketplace .list-ctl .ops-selects {
+.liteloader .ops-selects {
     display: flex;
     gap: 8px;
-}
-
-/* 选择框按钮-文本 */
-.plugins_marketplace .list-ctl .q-pulldown-menu-button .content {
-    width: 80px;
-}
-
-/* 选择框按钮-图标 */
-.plugins_marketplace .list-ctl .q-pulldown-menu-button .icon {
-    width: 16px;
-    height: 16px;
-}
-
-/* 选择框选项菜单 */
-.plugins_marketplace .list-ctl .q-context-menu {
-    z-index: 4000;
-    margin-top: 5px;
-    width: 122px;
-}
-
-/* 选择框选项菜单-图标 */
-.plugins_marketplace .list-ctl .q-context-menu .icon {
-    display: none;
-    width: 1em;
-    height: 1em;
-}
-
-/* 选择框选项菜单-选择后图标 */
-.plugins_marketplace .list-ctl .q-context-menu .selected .icon {
-    display: block !important;
 }
 
 /* 搜索框 */

@@ -40,7 +40,7 @@
 }
 
 /* 选择框容器 */
-.liteloader .ops-selects {
+.plugins_marketplace .list-ctl .ops-selects {
     display: flex;
     gap: 8px;
 }
@@ -66,45 +66,27 @@
 /**************/
 
 
-/* 插件列表-列表 */
-.plugins_marketplace .single {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-}
-
-/* 插件列表-网格 */
-.plugins_marketplace .double {
+/* 插件列表 */
+.plugins_marketplace .plugin-list {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
 }
 
 /* 插件条目容器 */
-.plugins_marketplace .wrap {
+.plugins_marketplace .plugin-list .wrap {
     width: 100%;
 }
 
-/* 插件列表条目去掉外边距 */
-.plugins_marketplace .single .wrap {
+/* 插件列表条目-单列 */
+.plugins_marketplace .plugin-list.single .wrap {
     margin: unset;
 }
 
-/* 插件列表条目去掉外边距 */
-.plugins_marketplace .double .wrap {
+/* 插件列表条目-双列 */
+.plugins_marketplace .plugin-list.double .wrap {
     margin: unset;
     flex-basis: calc(50% - 10px);
-}
-
-/* 插件列表-正序 */
-.plugins_marketplace .forward {
-    flex-wrap: wrap;
-}
-
-/* 插件列表-倒序 */
-.plugins_marketplace .reverse {
-    flex-direction: row-reverse;
-    flex-wrap: wrap-reverse;
 }
 
 /* 插件缩略图 */
@@ -171,36 +153,36 @@
 /***********/
 
 
-.plugins_marketplace .loose .wrap {
+.plugins_marketplace .plugin-list.loose .wrap {
     padding: 0px 16px;
 }
 
-.plugins_marketplace .loose .vertical-list-item {
+.plugins_marketplace .plugin-list.loose .vertical-list-item {
     margin: 16px 0px;
 }
 
 /* 插件缩略图 */
-.plugins_marketplace .loose .thumbnail {
+.plugins_marketplace .plugin-list.loose .thumbnail {
     width: 56px;
     height: 56px;
 }
 
-.plugins_marketplace .loose .info {
+.plugins_marketplace .plugin-list.loose .info {
     margin: 0px 16px;
 }
 
 /* 插件描述 */
-.plugins_marketplace .loose .info .description {
+.plugins_marketplace .plugin-list.loose .info .description {
     margin-top: 4px;
 }
 
 /* 插件按钮容器 */
-.plugins_marketplace .loose .ops-btns {
+.plugins_marketplace .plugin-list.loose .ops-btns {
     gap: 8px;
 }
 
 /* 插件附加信息 */
-.plugins_marketplace .loose .extra-information span {
+.plugins_marketplace .plugin-list.loose .extra-information span {
     margin-right: 12px;
 }
 
@@ -210,35 +192,35 @@
 /***********/
 
 
-.plugins_marketplace .compact .wrap {
+.plugins_marketplace .plugin-list.compact .wrap {
     padding: 0px 8px;
 }
 
-.plugins_marketplace .compact .vertical-list-item {
+.plugins_marketplace .plugin-list.compact .vertical-list-item {
     margin: 8px 0px;
 }
 
 /* 插件缩略图 */
-.plugins_marketplace .compact .thumbnail {
+.plugins_marketplace .plugin-list.compact .thumbnail {
     width: 52px;
     height: 52px;
 }
 
-.plugins_marketplace .compact .info {
+.plugins_marketplace .plugin-list.compact .info {
     margin: 0px 8px;
 }
 
 /* 插件描述 */
-.plugins_marketplace .compact .info .description {
+.plugins_marketplace .plugin-list.compact .info .description {
     margin-top: 0px;
 }
 
 /* 插件按钮容器 */
-.plugins_marketplace .compact .ops-btns {
+.plugins_marketplace .plugin-list.compact .ops-btns {
     gap: 4px;
 }
 
 /* 插件附加信息 */
-.plugins_marketplace .compact .extra-information span {
+.plugins_marketplace .plugin-list.compact .extra-information span {
     margin-right: 6px;
 }

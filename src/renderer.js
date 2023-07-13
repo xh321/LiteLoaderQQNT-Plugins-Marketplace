@@ -11,6 +11,12 @@ platform_map.set("linux", "Linux");
 platform_map.set("darwin", "MacOS");
 
 
+// 自定义事件，上一页与下一页
+const plugin_list_page_event_target = new EventTarget();
+const previous_page_event = new CustomEvent("previousPage");
+const next_page_event = new CustomEvent("nextPage");
+
+
 // 对比本地与远端的版本号，有新版就返回true
 function compareVersion(local_version, remote_version) {
     // 将字符串改为数组
@@ -100,46 +106,89 @@ function createPluginItem() {
 }
 
 
-// 初始化插件列表区域
-async function initPluginList(view) {
-    // 获取配置文件
-    const config = await plugins_marketplace.getConfig();
+// 合并插件源为新列表
+async function mergeMirrorlist(mirrorlist) {
+    const mirrorlist_set = new Set();
 
-    const plugin_list = [];
+    // 同时请求多个源的列表，并按照顺序返回
+    const requests = mirrorlist.map(url => fetch(url));
+    const responses = await Promise.allSettled(requests);
 
     // 处理多个仓库源
-    for (const url of config.mirrorlist) {
-        const list = await (await fetch(url)).json();
-
+    for (const response of responses) {
         // 将每个源的列表整合到一个列表中
-        list.forEach(item => {
-            // 检查是否已存在相同的JSON对象
-            const is_duplicate = plugin_list.some(existing_item => {
-                return existing_item.repo === item.repo && existing_item.branch === item.branch;
-            });
-
-            // 如果不存在重复的JSON对象，则添加到列表中
-            if (!is_duplicate) {
-                plugin_list.push(item);
-            }
-        });
+        if (response.status == "fulfilled") {
+            const list = await response.value.json();
+            list.forEach(item => mirrorlist_set.add(JSON.stringify(item)));
+        }
     }
 
+    // 转换为数组返回
+    return Array.from(mirrorlist_set, item => JSON.parse(item));
+}
 
+
+// 获取manifest并合并为列表返回
+async function getManifestList(mirrorlist) {
+    const plugins_list = [];
+
+    // 同时请求多个源的列表，并按照顺序返回
+    const requests = mirrorlist.map(info => {
+        const url = `https://raw.githubusercontent.com/${info.repo}/${info.branch}/manifest.json`;
+        return fetch(url);
+    });
+    const responses = await Promise.allSettled(requests);
+
+    // 处理manifest列表
+    for (const response of responses) {
+        if (response.status == "fulfilled") {
+            const manifest = await response.value.json();
+            plugins_list.push(manifest);
+        }
+    }
+
+    return plugins_list;
+}
+
+
+// Fisher-Yates算法
+function shuffleList(list) {
+    const shuffled_list = [...list];
+
+    for (let i = shuffled_list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        // 交换元素位置
+        [shuffled_list[i], shuffled_list[j]] = [shuffled_list[j], shuffled_list[i]];
+    }
+
+    return shuffled_list;
+}
+
+
+// 数组分组
+function groupArrayElements(arr, num) {
+    const result = [];
+    for (let i = 0; i < arr.length; i += num) {
+        result.push(arr.slice(i, i + num));
+    }
+    return result;
+}
+
+
+// 给插件列表添加内容
+function getPluginListContentFragment(manifest_list) {
     const pluginItem = createPluginItem();
     const fragment = document.createDocumentFragment();
 
-    for (const info of plugin_list) {
-        const url = `https://ghproxy.com/https://raw.githubusercontent.com/${info.repo}/${info.branch}/manifest.json`;
-        const manifest = await (await fetch(url)).json();
+    for (const manifest of manifest_list) {
         const plugin_item = pluginItem(
             manifest,
             // 详情
-            async () => open(`https://github.com/${info.repo}/tree/${info.branch}`),
+            async () => open(`https://github.com/${manifest.repository.repo}/tree/${manifest.repository.branch}`),
             // 安装
             async event => {
                 event.target.disabled = true;
-                const status_is_ok = await plugins_marketplace.install(info);
+                const status_is_ok = await plugins_marketplace.install(manifest.repository);
                 if (status_is_ok) {
                     event.target.classList.toggle("hidden", true);
                     const parentNode = event.target.parentNode;
@@ -161,7 +210,7 @@ async function initPluginList(view) {
             // 更新
             async event => {
                 event.target.disabled = true;
-                const status_is_ok = await plugins_marketplace.update(info, manifest.slug);
+                const status_is_ok = await plugins_marketplace.update(manifest.repository, manifest.slug);
                 if (status_is_ok) {
                     event.target.classList.toggle("hidden", true);
                     const parentNode = event.target.parentNode;
@@ -179,7 +228,38 @@ async function initPluginList(view) {
         fragment.appendChild(plugin_item);
     }
 
-    view.appendChild(fragment);
+    return fragment;
+}
+
+
+// 初始化插件列表区域
+async function initPluginList(plugin_list, list_ctl) {
+    const config = await plugins_marketplace.getConfig();
+    const mirrorlist = await mergeMirrorlist(config.mirrorlist);
+    // 每十个分组，结果类似于 [[1,2,3,4,5,6,7,8,9,10],[11,12]];
+    const mirrorlist_chunks = groupArrayElements(mirrorlist, 10);
+
+    // 页面指标
+    const current_page_text = list_ctl.querySelector(".current-page");
+    const total_page_text = list_ctl.querySelector(".total-page");
+    current_page_text.textContent = mirrorlist_chunks.length > 0 ? 1 : 0;
+    total_page_text.textContent = mirrorlist_chunks.length;
+
+    // 切换页面
+    const switch_page = async () => {
+        plugin_list.textContent = null;
+        const current_page = parseInt(current_page_text.textContent) - 1;
+        const manifest_list = await getManifestList(mirrorlist_chunks[current_page]);
+        const fragment = getPluginListContentFragment(manifest_list);
+        plugin_list.appendChild(fragment);
+    }
+
+    // 初始化界面
+    switch_page();
+
+    // 触发上一页与下一页
+    plugin_list_page_event_target.addEventListener("previousPage", switch_page);
+    plugin_list_page_event_target.addEventListener("nextPage", switch_page);
 }
 
 
@@ -303,8 +383,6 @@ async function initListCtl(list_ctl, plugin_list) {
                         break;
                     case "sort_order_2":
                         config.sort_order = [config["sort_order"][0], item_value];
-                        plugin_list.classList.remove("forward", "reverse");
-                        plugin_list.classList.add(item_value);
                         break;
                     case "list_style_1":
                         config.list_style = [item_value, config["list_style"][1]];
@@ -323,6 +401,32 @@ async function initListCtl(list_ctl, plugin_list) {
             }
         });
     }
+
+
+    // 页码指标，上一页，下一页
+    const current_page_text = list_ctl.querySelector(".current-page");
+    const total_page_text = list_ctl.querySelector(".total-page");
+
+    const previous_page_btn = list_ctl.querySelector(".previous-page");
+    const next_page_btn = list_ctl.querySelector(".next-page");
+
+    current_page_text.textContent = 0;
+    total_page_text.textContent = 0;
+
+    previous_page_btn.addEventListener("click", () => {
+        const content = current_page_text.textContent;
+        if (parseInt(content) > 1) {
+            current_page_text.textContent = parseInt(content) - 1;
+            plugin_list_page_event_target.dispatchEvent(previous_page_event);
+        }
+    });
+    next_page_btn.addEventListener("click", () => {
+        const content = current_page_text.textContent;
+        if (parseInt(content) < parseInt(total_page_text.textContent)) {
+            current_page_text.textContent = parseInt(content) + 1;
+            plugin_list_page_event_target.dispatchEvent(next_page_event);
+        }
+    });
 }
 
 
@@ -348,5 +452,5 @@ export async function onConfigView(view) {
     const list_ctl = view.querySelector(".list-ctl");
     const plugin_list = view.querySelector(".plugin-list");
     await initListCtl(list_ctl, plugin_list);
-    await initPluginList(plugin_list);
+    await initPluginList(plugin_list, list_ctl);
 }

@@ -15,6 +15,10 @@ platform_map.set("darwin", "MacOS");
 const plugin_list_page_event_target = new EventTarget();
 const previous_page_event = new CustomEvent("previousPage");
 const next_page_event = new CustomEvent("nextPage");
+const list_random_event = new CustomEvent("listRandom");
+const list_sequence_event = new CustomEvent("listSequence");
+const list_forward_event = new CustomEvent("listForward");
+const list_reverse_event = new CustomEvent("listReverse");
 
 
 // 对比本地与远端的版本号，有新版就返回true
@@ -235,31 +239,90 @@ function getPluginListContentFragment(manifest_list) {
 // 初始化插件列表区域
 async function initPluginList(plugin_list, list_ctl) {
     const config = await plugins_marketplace.getConfig();
-    const mirrorlist = await mergeMirrorlist(config.mirrorlist);
-    // 每十个分组，结果类似于 [[1,2,3,4,5,6,7,8,9,10],[11,12]];
-    const mirrorlist_chunks = groupArrayElements(mirrorlist, 10);
 
-    // 页面指标
+    const mirrorlist = await mergeMirrorlist(config.mirrorlist);
+    let mirrorlist_chunks = groupArrayElements(mirrorlist, 10);
+
+    // 初始化界面
     const current_page_text = list_ctl.querySelector(".current-page");
     const total_page_text = list_ctl.querySelector(".total-page");
     current_page_text.textContent = mirrorlist_chunks.length > 0 ? 1 : 0;
     total_page_text.textContent = mirrorlist_chunks.length;
 
     // 切换页面
-    const switch_page = async () => {
-        plugin_list.textContent = null;
+    const switchPage = async () => {
         const current_page = parseInt(current_page_text.textContent) - 1;
         const manifest_list = await getManifestList(mirrorlist_chunks[current_page]);
         const fragment = getPluginListContentFragment(manifest_list);
+        plugin_list.innerHTML = "";
         plugin_list.appendChild(fragment);
     }
 
-    // 初始化界面
-    switch_page();
-
     // 触发上一页与下一页
-    plugin_list_page_event_target.addEventListener("previousPage", switch_page);
-    plugin_list_page_event_target.addEventListener("nextPage", switch_page);
+    plugin_list_page_event_target.addEventListener("previousPage", switchPage);
+    plugin_list_page_event_target.addEventListener("nextPage", switchPage);
+
+
+    let random = shuffleList(mirrorlist);
+    let sequence = [...mirrorlist];
+    let forward = [];
+    let reverse = [];
+
+    // 列表排序
+    plugin_list_page_event_target.addEventListener("listRandom", () => {
+        if (plugin_list.classList.contains("forward")) {
+            random = shuffleList(forward);
+        }
+        else if (plugin_list.classList.contains("reverse")) {
+            random = shuffleList(reverse);
+        }
+        mirrorlist_chunks = groupArrayElements(random, 10);
+        switchPage();
+    });
+
+    plugin_list_page_event_target.addEventListener("listSequence", () => {
+        if (plugin_list.classList.contains("forward")) {
+            sequence = [...mirrorlist];
+        }
+        else if (plugin_list.classList.contains("reverse")) {
+            sequence = [...mirrorlist];
+        }
+        mirrorlist_chunks = groupArrayElements(sequence, 10);
+        switchPage();
+    });
+
+    plugin_list_page_event_target.addEventListener("listForward", () => {
+        if (plugin_list.classList.contains("random")) {
+            forward = [...random];
+        }
+        else if (plugin_list.classList.contains("sequence")) {
+            forward = [...sequence];
+        }
+        mirrorlist_chunks = groupArrayElements(forward, 10);
+        switchPage();
+    });
+
+    plugin_list_page_event_target.addEventListener("listReverse", () => {
+        if (plugin_list.classList.contains("random")) {
+            reverse = [...random].reverse();
+        }
+        else if (plugin_list.classList.contains("sequence")) {
+            reverse = [...sequence].reverse();
+        }
+        mirrorlist_chunks = groupArrayElements(reverse, 10);
+        switchPage();
+    });
+
+
+    // 初始化
+    switch (config.sort_order[1]) {
+        case "forward":
+            plugin_list_page_event_target.dispatchEvent(list_forward_event);
+            break;
+        case "reverse":
+            plugin_list_page_event_target.dispatchEvent(list_reverse_event);
+            break;
+    }
 }
 
 
@@ -334,21 +397,22 @@ async function initListCtl(list_ctl, plugin_list) {
             case "sort_order_1": {
                 const value = config.sort_order[0];
                 setValueAndAddSelectedClass(value);
+                plugin_list.classList.add(value);
             } break;
             case "sort_order_2": {
                 const value = config.sort_order[1];
                 setValueAndAddSelectedClass(value);
-                plugin_list.classList.add(config.sort_order[1]);
+                plugin_list.classList.add(value);
             } break;
             case "list_style_1": {
                 const value = config.list_style[0];
                 setValueAndAddSelectedClass(value);
-                plugin_list.classList.add(config.list_style[0]);
+                plugin_list.classList.add(value);
             } break;
             case "list_style_2": {
                 const value = config.list_style[1];
                 setValueAndAddSelectedClass(value);
-                plugin_list.classList.add(config.list_style[1]);
+                plugin_list.classList.add(value);
             } break;
         }
 
@@ -372,18 +436,37 @@ async function initListCtl(list_ctl, plugin_list) {
 
                 // 判断是哪个选择框的，单独设置
                 switch (pulldown_menu.dataset.id) {
+                    // 插件类型
                     case "plugin_type_1":
                         config.plugin_type = [item_value, config["plugin_type"][1]];
                         break;
                     case "plugin_type_2":
                         config.plugin_type = [config["plugin_type"][0], item_value];
                         break;
+                    // 排序顺序
                     case "sort_order_1":
                         config.sort_order = [item_value, config["sort_order"][1]];
+                        plugin_list.classList.remove("random", "sequence");
+                        plugin_list.classList.add(item_value);
+                        if (item_value == "random") {
+                            plugin_list_page_event_target.dispatchEvent(list_random_event);
+                        }
+                        if (item_value == "sequence") {
+                            plugin_list_page_event_target.dispatchEvent(list_sequence_event);
+                        }
                         break;
                     case "sort_order_2":
                         config.sort_order = [config["sort_order"][0], item_value];
+                        plugin_list.classList.remove("forward", "reverse");
+                        plugin_list.classList.add(item_value);
+                        if (item_value == "forward") {
+                            plugin_list_page_event_target.dispatchEvent(list_forward_event);
+                        }
+                        if (item_value == "reverse") {
+                            plugin_list_page_event_target.dispatchEvent(list_reverse_event);
+                        }
                         break;
+                    // 列表样式
                     case "list_style_1":
                         config.list_style = [item_value, config["list_style"][1]];
                         plugin_list.classList.remove("single", "double");

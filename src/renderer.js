@@ -44,69 +44,88 @@ function compareVersion(local_version, remote_version) {
 }
 
 
+// Fisher-Yates算法
+function shuffleList(list) {
+    const shuffled_list = [...list];
+    for (let i = shuffled_list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        // 交换元素位置
+        [shuffled_list[i], shuffled_list[j]] = [shuffled_list[j], shuffled_list[i]];
+    }
+    return shuffled_list;
+}
+
+
+// 数组分组
+function groupArrayElements(arr, num) {
+    const result = [];
+    for (let i = 0; i < arr.length; i += num) {
+        result.push(arr.slice(i, i + num));
+    }
+    return result;
+}
+
+
 // 一个插件列表-插件条目生成函数
-function createPluginItem() {
-    const parser = new DOMParser();
-    return (manifest, details, install, uninstall, update, restart) => {
-        const temp = `
-        <div class="wrap" data-plugin-type="${manifest.type}">
-            <div class="vertical-list-item">
-                <img src="${manifest?.thumbnail ?? ""}" class="thumbnail">
-                <div class="info">
-                    <h2 class="name">${manifest.name}</h2>
-                    <p class="secondary-text description">${manifest.description}</p>
-                </div>
-                <div class="ops-btns">
-                    <button class="q-button q-button--small q-button--secondary details">详情</button>
-                    <button class="q-button q-button--small q-button--secondary install">安装</button>
-                    <button class="q-button q-button--small q-button--secondary uninstall">卸载</button>
-                    <button class="q-button q-button--small q-button--secondary update">更新</button>
-                    <button class="q-button q-button--small q-button--secondary restart">重启</button>
-                </div>
+function createPluginItem(manifest, details, install, uninstall, update, restart) {
+    const temp = `
+    <div class="wrap" data-plugin-type="${manifest.type}">
+        <div class="vertical-list-item">
+            <img src="${manifest?.thumbnail ?? ""}" class="thumbnail">
+            <div class="info">
+                <h2 class="name">${manifest.name}</h2>
+                <p class="secondary-text description">${manifest.description}</p>
             </div>
-            <hr class="horizontal-dividing-line" />
-            <div class="vertical-list-item">
-                <p class="secondary-text extra-information">
-                    <span>类型：${type_map.get(manifest.type)}</span>
-                    <span>平台：${manifest?.platform?.map(platform => platform_map.get(platform)?.toString())}</span>
-                    <span>版本：${manifest.version}</span>
-                    <span>开发：
-                        <a href="${manifest.author[0].link}" target="_blank">${manifest.author[0].name}</a>
-                    </span>
-                </p>
+            <div class="ops-btns">
+                <button class="q-button q-button--small q-button--secondary details">详情</button>
+                <button class="q-button q-button--small q-button--secondary install">安装</button>
+                <button class="q-button q-button--small q-button--secondary uninstall">卸载</button>
+                <button class="q-button q-button--small q-button--secondary update">更新</button>
+                <button class="q-button q-button--small q-button--secondary restart">重启</button>
             </div>
         </div>
-        `;
-        const doc = parser.parseFromString(temp, "text/html");
+        <hr class="horizontal-dividing-line" />
+        <div class="vertical-list-item">
+            <p class="secondary-text extra-information">
+                <span>类型：${type_map.get(manifest.type)}</span>
+                <span>平台：${manifest?.platform?.map(platform => platform_map.get(platform).toString())}</span>
+                <span>版本：${manifest.version}</span>
+                <span>开发：
+                    <a href="${manifest.author[0].link}" target="_blank">${manifest.author[0].name}</a>
+                </span>
+            </p>
+        </div>
+    </div>
+    `;
+    const doc = new DOMParser().parseFromString(temp, "text/html");
 
-        // 获取按钮
-        const details_btn = doc.querySelector(".details");
-        const install_btn = doc.querySelector(".install");
-        const uninstall_btn = doc.querySelector(".uninstall");
-        const update_btn = doc.querySelector(".update");
-        const restart_btn = doc.querySelector(".restart");
+    // 获取按钮
+    const details_btn = doc.querySelector(".details");
+    const install_btn = doc.querySelector(".install");
+    const uninstall_btn = doc.querySelector(".uninstall");
+    const update_btn = doc.querySelector(".update");
+    const restart_btn = doc.querySelector(".restart");
 
-        // 初始化按钮功能
-        details_btn.addEventListener("click", details);
-        install_btn.addEventListener("click", install);
-        uninstall_btn.addEventListener("click", uninstall);
-        update_btn.addEventListener("click", update);
-        restart_btn.addEventListener("click", restart);
+    // 初始化按钮功能
+    details_btn.addEventListener("click", details);
+    install_btn.addEventListener("click", install);
+    uninstall_btn.addEventListener("click", uninstall);
+    update_btn.addEventListener("click", update);
+    restart_btn.addEventListener("click", restart);
 
-        // 获取插件状态
-        const local_version = LiteLoader.plugins[manifest.slug]?.manifest?.version ?? "";
-        const remote_version = manifest.version;
-        const is_installed = manifest.slug in LiteLoader.plugins;
-        const is_updated = !compareVersion(local_version, remote_version);
+    // 获取插件状态
+    const local_version = LiteLoader.plugins[manifest.slug]?.manifest?.version ?? "";
+    const remote_version = manifest.version;
+    const is_installed = manifest.slug in LiteLoader.plugins;
+    const is_updated = !compareVersion(local_version, remote_version);
 
-        // 初始化按钮显示
-        install_btn.classList.toggle("hidden", is_installed);
-        uninstall_btn.classList.toggle("hidden", !(is_installed && is_updated));
-        update_btn.classList.toggle("hidden", !(is_installed && !is_updated));
-        restart_btn.classList.toggle("hidden", true);
+    // 初始化按钮显示
+    install_btn.classList.toggle("hidden", is_installed);
+    uninstall_btn.classList.toggle("hidden", !(is_installed && is_updated));
+    update_btn.classList.toggle("hidden", !(is_installed && !is_updated));
+    restart_btn.classList.toggle("hidden", true);
 
-        return doc.querySelector(".wrap");
-    }
+    return doc.querySelector(".wrap");
 }
 
 
@@ -155,37 +174,11 @@ async function getManifestList(mirrorlist) {
 }
 
 
-// Fisher-Yates算法
-function shuffleList(list) {
-    const shuffled_list = [...list];
-
-    for (let i = shuffled_list.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        // 交换元素位置
-        [shuffled_list[i], shuffled_list[j]] = [shuffled_list[j], shuffled_list[i]];
-    }
-
-    return shuffled_list;
-}
-
-
-// 数组分组
-function groupArrayElements(arr, num) {
-    const result = [];
-    for (let i = 0; i < arr.length; i += num) {
-        result.push(arr.slice(i, i + num));
-    }
-    return result;
-}
-
-
 // 给插件列表添加内容
 function getPluginListContentFragment(manifest_list) {
-    const pluginItem = createPluginItem();
     const fragment = document.createDocumentFragment();
-
     for (const manifest of manifest_list) {
-        const plugin_item = pluginItem(
+        const plugin_item = createPluginItem(
             manifest,
             // 详情
             async () => open(`https://github.com/${manifest.repository.repo}/tree/${manifest.repository.branch}`),
@@ -196,7 +189,7 @@ function getPluginListContentFragment(manifest_list) {
                 if (status_is_ok) {
                     event.target.classList.toggle("hidden", true);
                     const parentNode = event.target.parentNode;
-                    parentNode.querySelector(".restart").classList.toggle("hidden", false);
+                    parentNode.querySelector(".restart").classList.remove("hidden");
                 }
                 event.target.disabled = false;
             },
@@ -207,7 +200,7 @@ function getPluginListContentFragment(manifest_list) {
                 if (status_is_ok) {
                     event.target.classList.toggle("hidden", true);
                     const parentNode = event.target.parentNode;
-                    parentNode.querySelector(".restart").classList.toggle("hidden", false);
+                    parentNode.querySelector(".restart").classList.remove("hidden");
                 }
                 event.target.disabled = false;
             },
@@ -218,7 +211,7 @@ function getPluginListContentFragment(manifest_list) {
                 if (status_is_ok) {
                     event.target.classList.toggle("hidden", true);
                     const parentNode = event.target.parentNode;
-                    parentNode.querySelector(".restart").classList.toggle("hidden", false);
+                    parentNode.querySelector(".restart").classList.remove("hidden");
                 }
                 event.target.disabled = false;
             },
@@ -228,10 +221,8 @@ function getPluginListContentFragment(manifest_list) {
                 await plugins_marketplace.restart();
             }
         );
-
         fragment.appendChild(plugin_item);
     }
-
     return fragment;
 }
 
@@ -239,7 +230,6 @@ function getPluginListContentFragment(manifest_list) {
 // 初始化插件列表区域
 async function initPluginList(plugin_list, list_ctl) {
     const config = await plugins_marketplace.getConfig();
-
     const mirrorlist = await mergeMirrorlist(config.mirrorlist);
     let mirrorlist_chunks = groupArrayElements(mirrorlist, 10);
 
@@ -248,6 +238,7 @@ async function initPluginList(plugin_list, list_ctl) {
     const total_page_text = list_ctl.querySelector(".total-page");
     current_page_text.textContent = mirrorlist_chunks.length > 0 ? 1 : 0;
     total_page_text.textContent = mirrorlist_chunks.length;
+
 
     // 切换页面
     const switchPage = async () => {
@@ -263,56 +254,29 @@ async function initPluginList(plugin_list, list_ctl) {
     plugin_list_page_event_target.addEventListener("nextPage", switchPage);
 
 
-    let random = shuffleList(mirrorlist);
-    let sequence = [...mirrorlist];
-    let forward = [];
-    let reverse = [];
-
     // 列表排序
-    plugin_list_page_event_target.addEventListener("listRandom", () => {
-        if (plugin_list.classList.contains("forward")) {
-            random = shuffleList(forward);
-        }
-        else if (plugin_list.classList.contains("reverse")) {
-            random = shuffleList(reverse);
-        }
-        mirrorlist_chunks = groupArrayElements(random, 10);
-        switchPage();
-    });
+    const triggerSortEvent = () => {
+        let sorted_list = [];
 
-    plugin_list_page_event_target.addEventListener("listSequence", () => {
-        if (plugin_list.classList.contains("forward")) {
-            sequence = [...mirrorlist];
-        }
-        else if (plugin_list.classList.contains("reverse")) {
-            sequence = [...mirrorlist];
-        }
-        mirrorlist_chunks = groupArrayElements(sequence, 10);
-        switchPage();
-    });
-
-    plugin_list_page_event_target.addEventListener("listForward", () => {
         if (plugin_list.classList.contains("random")) {
-            forward = [...random];
+            sorted_list = shuffleList(mirrorlist);
         }
         else if (plugin_list.classList.contains("sequence")) {
-            forward = [...sequence];
+            sorted_list = [...mirrorlist];
         }
-        mirrorlist_chunks = groupArrayElements(forward, 10);
-        switchPage();
-    });
 
-    plugin_list_page_event_target.addEventListener("listReverse", () => {
-        if (plugin_list.classList.contains("random")) {
-            reverse = [...random].reverse();
+        if (plugin_list.classList.contains("reverse")) {
+            sorted_list.reverse();
         }
-        else if (plugin_list.classList.contains("sequence")) {
-            reverse = [...sequence].reverse();
-        }
-        mirrorlist_chunks = groupArrayElements(reverse, 10);
-        switchPage();
-    });
 
+        mirrorlist_chunks = groupArrayElements(sorted_list, 10);
+        switchPage();
+    }
+
+    plugin_list_page_event_target.addEventListener("listRandom", triggerSortEvent);
+    plugin_list_page_event_target.addEventListener("listSequence", triggerSortEvent);
+    plugin_list_page_event_target.addEventListener("listForward", triggerSortEvent);
+    plugin_list_page_event_target.addEventListener("listReverse", triggerSortEvent);
 
     // 初始化
     switch (config.sort_order[1]) {

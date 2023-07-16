@@ -90,6 +90,7 @@ function setConfig(liteloader, new_config) {
     }
 }
 
+
 async function install(liteloader, info) {
     const latest_release_url = `https://github.com/${info.repo}/releases/latest`;
     const source_code_url = `https://codeload.github.com/${info.repo}/zip/refs/heads/${info.branch}`;
@@ -128,7 +129,6 @@ async function install(liteloader, info) {
         return false;
     }
 }
-
 
 
 async function uninstall(liteloader, slug, update_mode = false) {

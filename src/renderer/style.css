@@ -70,22 +70,16 @@
 .plugins_marketplace .plugin-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 20px;
-}
-
-/* 插件条目容器 */
-.plugins_marketplace .plugin-list .wrap {
-    width: 100%;
+    gap: 0px 20px;
 }
 
 /* 插件列表条目-单列 */
 .plugins_marketplace .plugin-list.single .wrap {
-    margin: unset;
+    flex-basis: 100%;
 }
 
 /* 插件列表条目-双列 */
 .plugins_marketplace .plugin-list.double .wrap {
-    margin: unset;
     flex-basis: calc(50% - 10px);
 }
 

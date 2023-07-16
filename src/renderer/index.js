@@ -1,3 +1,15 @@
+// 插件本体的路径
+const plugin_path = LiteLoader.plugins.plugins_marketplace.path;
+
+
+// 导入工具函数
+const utils = await import(`file://${plugin_path.plugin}/src/renderer/utils.js`);
+
+
+// 获取配置文件
+const config = await plugins_marketplace.getConfig();
+
+
 // 创建一个类型映射
 const type_map = new Map();
 type_map.set("core", "核心");
@@ -11,59 +23,14 @@ platform_map.set("linux", "Linux");
 platform_map.set("darwin", "MacOS");
 
 
-// 自定义事件，上一页与下一页
-const plugin_list_page_event_target = new EventTarget();
-const previous_page_event = new CustomEvent("previousPage");
-const next_page_event = new CustomEvent("nextPage");
-const list_random_event = new CustomEvent("listRandom");
-const list_sequence_event = new CustomEvent("listSequence");
-const list_forward_event = new CustomEvent("listForward");
-const list_reverse_event = new CustomEvent("listReverse");
-
-
-// 对比本地与远端的版本号，有新版就返回true
-function compareVersion(local_version, remote_version) {
-    // 将字符串改为数组
-    const local_version_arr = local_version.trim().split(".");
-    const remote_version_arr = remote_version.trim().split(".");
-    // 返回数组长度最大的
-    const max_length = Math.max(local_version_arr.length, remote_version_arr.length);
-    // 从头对比每一个
-    for (let i = 0; i < max_length; i++) {
-        // 将字符串改为数字
-        const local_version_num = parseInt(local_version_arr?.[i] ?? "0");
-        const remote_version_num = parseInt(remote_version_arr?.[i] ?? "0");
-        // 版本号不相等
-        if (local_version_num != remote_version_num) {
-            // 有更新返回true，没更新返回false
-            return local_version_num < remote_version_num;
-        }
-    }
-    // 版本号相等，返回false
-    return false;
-}
-
-
-// Fisher-Yates算法
-function shuffleList(list) {
-    const shuffled_list = [...list];
-    for (let i = shuffled_list.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        // 交换元素位置
-        [shuffled_list[i], shuffled_list[j]] = [shuffled_list[j], shuffled_list[i]];
-    }
-    return shuffled_list;
-}
-
-
-// 数组分组
-function groupArrayElements(arr, num) {
-    const result = [];
-    for (let i = 0; i < arr.length; i += num) {
-        result.push(arr.slice(i, i + num));
-    }
-    return result;
-}
+// 自定义事件
+const list_ctl_event_target = new EventTarget();
+const list_ctl_previous_page_event = new CustomEvent("previousPage");
+const list_ctl_next_page_event = new CustomEvent("nextPage");
+const list_ctl_random_event = new CustomEvent("random");
+const list_ctl_sequence_event = new CustomEvent("sequence");
+const list_ctl_forward_event = new CustomEvent("forward");
+const list_ctl_reverse_event = new CustomEvent("reverse");
 
 
 // 一个插件列表-插件条目生成函数
@@ -117,7 +84,7 @@ function createPluginItem(manifest, details, install, uninstall, update, restart
     const local_version = LiteLoader.plugins[manifest.slug]?.manifest?.version ?? "";
     const remote_version = manifest.version;
     const is_installed = manifest.slug in LiteLoader.plugins;
-    const is_updated = !compareVersion(local_version, remote_version);
+    const is_updated = !utils.compareVersion(local_version, remote_version);
 
     // 初始化按钮显示
     install_btn.classList.toggle("hidden", is_installed);
@@ -229,9 +196,8 @@ function getPluginListContentFragment(manifest_list) {
 
 // 初始化插件列表区域
 async function initPluginList(plugin_list, list_ctl) {
-    const config = await plugins_marketplace.getConfig();
     const mirrorlist = await mergeMirrorlist(config.mirrorlist);
-    let mirrorlist_chunks = groupArrayElements(mirrorlist, 10);
+    let mirrorlist_chunks = utils.groupArrayElements(mirrorlist, 10);
 
     // 初始化界面
     const current_page_text = list_ctl.querySelector(".current-page");
@@ -250,8 +216,8 @@ async function initPluginList(plugin_list, list_ctl) {
     }
 
     // 触发上一页与下一页
-    plugin_list_page_event_target.addEventListener("previousPage", switchPage);
-    plugin_list_page_event_target.addEventListener("nextPage", switchPage);
+    list_ctl_event_target.addEventListener("previousPage", switchPage);
+    list_ctl_event_target.addEventListener("nextPage", switchPage);
 
 
     // 列表排序
@@ -259,7 +225,7 @@ async function initPluginList(plugin_list, list_ctl) {
         let sorted_list = [];
 
         if (plugin_list.classList.contains("random")) {
-            sorted_list = shuffleList(mirrorlist);
+            sorted_list = utils.shuffleList(mirrorlist);
         }
         else if (plugin_list.classList.contains("sequence")) {
             sorted_list = [...mirrorlist];
@@ -269,22 +235,22 @@ async function initPluginList(plugin_list, list_ctl) {
             sorted_list.reverse();
         }
 
-        mirrorlist_chunks = groupArrayElements(sorted_list, 10);
+        mirrorlist_chunks = utils.groupArrayElements(sorted_list, 10);
         switchPage();
     }
 
-    plugin_list_page_event_target.addEventListener("listRandom", triggerSortEvent);
-    plugin_list_page_event_target.addEventListener("listSequence", triggerSortEvent);
-    plugin_list_page_event_target.addEventListener("listForward", triggerSortEvent);
-    plugin_list_page_event_target.addEventListener("listReverse", triggerSortEvent);
+    list_ctl_event_target.addEventListener("random", triggerSortEvent);
+    list_ctl_event_target.addEventListener("sequence", triggerSortEvent);
+    list_ctl_event_target.addEventListener("forward", triggerSortEvent);
+    list_ctl_event_target.addEventListener("reverse", triggerSortEvent);
 
     // 初始化
     switch (config.sort_order[1]) {
         case "forward":
-            plugin_list_page_event_target.dispatchEvent(list_forward_event);
+            list_ctl_event_target.dispatchEvent(list_ctl_forward_event);
             break;
         case "reverse":
-            plugin_list_page_event_target.dispatchEvent(list_reverse_event);
+            list_ctl_event_target.dispatchEvent(list_ctl_reverse_event);
             break;
     }
 }
@@ -331,9 +297,6 @@ async function initListCtl(list_ctl, plugin_list) {
         }
     });
 
-
-    // 获取配置文件
-    const config = await plugins_marketplace.getConfig();
 
     // 选择框
     const pulldown_menus = list_ctl.querySelectorAll(".q-pulldown-menu");
@@ -413,10 +376,10 @@ async function initListCtl(list_ctl, plugin_list) {
                         plugin_list.classList.remove("random", "sequence");
                         plugin_list.classList.add(item_value);
                         if (item_value == "random") {
-                            plugin_list_page_event_target.dispatchEvent(list_random_event);
+                            list_ctl_event_target.dispatchEvent(list_ctl_random_event);
                         }
                         if (item_value == "sequence") {
-                            plugin_list_page_event_target.dispatchEvent(list_sequence_event);
+                            list_ctl_event_target.dispatchEvent(list_ctl_sequence_event);
                         }
                         break;
                     case "sort_order_2":
@@ -424,10 +387,10 @@ async function initListCtl(list_ctl, plugin_list) {
                         plugin_list.classList.remove("forward", "reverse");
                         plugin_list.classList.add(item_value);
                         if (item_value == "forward") {
-                            plugin_list_page_event_target.dispatchEvent(list_forward_event);
+                            list_ctl_event_target.dispatchEvent(list_ctl_forward_event);
                         }
                         if (item_value == "reverse") {
-                            plugin_list_page_event_target.dispatchEvent(list_reverse_event);
+                            list_ctl_event_target.dispatchEvent(list_ctl_reverse_event);
                         }
                         break;
                     // 列表样式
@@ -464,36 +427,34 @@ async function initListCtl(list_ctl, plugin_list) {
         const content = current_page_text.textContent;
         if (parseInt(content) > 1) {
             current_page_text.textContent = parseInt(content) - 1;
-            plugin_list_page_event_target.dispatchEvent(previous_page_event);
+            list_ctl_event_target.dispatchEvent(list_ctl_previous_page_event);
         }
     });
     next_page_btn.addEventListener("click", () => {
         const content = current_page_text.textContent;
         if (parseInt(content) < parseInt(total_page_text.textContent)) {
             current_page_text.textContent = parseInt(content) + 1;
-            plugin_list_page_event_target.dispatchEvent(next_page_event);
+            list_ctl_event_target.dispatchEvent(list_ctl_next_page_event);
         }
     });
 }
 
 
+// 配置界面
 export async function onConfigView(view) {
-    const plugin_path = LiteLoader.plugins.plugins_marketplace.path.plugin;
-    const css_file_path = `file://${plugin_path}/src/style.css`;
-    const html_file_path = `file://${plugin_path}/src/view.html`;
-
     // CSS
+    const css_file_path = `file://${plugin_path.plugin}/src/renderer/style.css`;
     const link_element = document.createElement("link");
     link_element.rel = "stylesheet";
     link_element.href = css_file_path;
     document.head.appendChild(link_element);
 
     // HTMl
+    const html_file_path = `file://${plugin_path.plugin}/src/renderer/view.html`;
     const html_text = await (await fetch(html_file_path)).text();
     const parser = new DOMParser();
     const doc = parser.parseFromString(html_text, "text/html");
     doc.querySelectorAll("section").forEach(node => view.appendChild(node));
-
 
     // 初始化
     const list_ctl = view.querySelector(".list-ctl");

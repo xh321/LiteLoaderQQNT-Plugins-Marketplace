@@ -25,5 +25,8 @@ contextBridge.exposeInMainWorld("plugins_marketplace", {
     ),
     restart: () => ipcRenderer.invoke(
         "LiteLoader.plugins_marketplace.restart"
+    ),
+    isOnline: () => ipcRenderer.invoke(
+        "LiteLoader.plugins_marketplace.isOnline"
     )
 });

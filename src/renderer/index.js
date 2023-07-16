@@ -32,11 +32,17 @@ const list_ctl_sequence_event = new CustomEvent("sequence");
 const list_ctl_forward_event = new CustomEvent("forward");
 const list_ctl_reverse_event = new CustomEvent("reverse");
 
+const list_tips_event_target = new EventTarget();
+const list_tips_offline_event = new CustomEvent("offline");
+const list_tips_loading_event = new CustomEvent("loading");
+const list_tips_error_event = new CustomEvent("error");
+const list_tips_end_event = new CustomEvent("end");
+
 
 // 一个插件列表-插件条目生成函数
 function createPluginItem(manifest, details, install, uninstall, update, restart) {
     const temp = `
-    <div class="wrap" data-plugin-type="${manifest.type}">
+    <div class="wrap">
         <div class="vertical-list-item">
             <img src="${manifest?.thumbnail ?? ""}" class="thumbnail">
             <div class="info">
@@ -191,68 +197,6 @@ function getPluginListContentFragment(manifest_list) {
         fragment.appendChild(plugin_item);
     }
     return fragment;
-}
-
-
-// 初始化插件列表区域
-async function initPluginList(plugin_list, list_ctl) {
-    const mirrorlist = await mergeMirrorlist(config.mirrorlist);
-    let mirrorlist_chunks = utils.groupArrayElements(mirrorlist, 10);
-
-    // 初始化界面
-    const current_page_text = list_ctl.querySelector(".current-page");
-    const total_page_text = list_ctl.querySelector(".total-page");
-    current_page_text.textContent = mirrorlist_chunks.length > 0 ? 1 : 0;
-    total_page_text.textContent = mirrorlist_chunks.length;
-
-
-    // 切换页面
-    const switchPage = async () => {
-        const current_page = parseInt(current_page_text.textContent) - 1;
-        const manifest_list = await getManifestList(mirrorlist_chunks[current_page]);
-        const fragment = getPluginListContentFragment(manifest_list);
-        plugin_list.innerHTML = "";
-        plugin_list.appendChild(fragment);
-    }
-
-    // 触发上一页与下一页
-    list_ctl_event_target.addEventListener("previousPage", switchPage);
-    list_ctl_event_target.addEventListener("nextPage", switchPage);
-
-
-    // 列表排序
-    const triggerSortEvent = () => {
-        let sorted_list = [];
-
-        if (plugin_list.classList.contains("random")) {
-            sorted_list = utils.shuffleList(mirrorlist);
-        }
-        else if (plugin_list.classList.contains("sequence")) {
-            sorted_list = [...mirrorlist];
-        }
-
-        if (plugin_list.classList.contains("reverse")) {
-            sorted_list.reverse();
-        }
-
-        mirrorlist_chunks = utils.groupArrayElements(sorted_list, 10);
-        switchPage();
-    }
-
-    list_ctl_event_target.addEventListener("random", triggerSortEvent);
-    list_ctl_event_target.addEventListener("sequence", triggerSortEvent);
-    list_ctl_event_target.addEventListener("forward", triggerSortEvent);
-    list_ctl_event_target.addEventListener("reverse", triggerSortEvent);
-
-    // 初始化
-    switch (config.sort_order[1]) {
-        case "forward":
-            list_ctl_event_target.dispatchEvent(list_ctl_forward_event);
-            break;
-        case "reverse":
-            list_ctl_event_target.dispatchEvent(list_ctl_reverse_event);
-            break;
-    }
 }
 
 
@@ -440,6 +384,106 @@ async function initListCtl(list_ctl, plugin_list) {
 }
 
 
+// 初始化列表提示区域
+async function initListTips(list_tips) {
+    const offline_tips = list_tips.querySelector(".offline");
+    const loading_tips = list_tips.querySelector(".loading");
+    const error_tips = list_tips.querySelector(".error");
+    const end_tips = list_tips.querySelector(".end");
+
+    list_tips_event_target.addEventListener("offline", () => {
+        offline_tips.classList.remove("hidden");
+    });
+
+    list_tips_event_target.addEventListener("loading", () => {
+        loading_tips.classList.remove("hidden");
+    });
+
+    list_tips_event_target.addEventListener("error", () => {
+        loading_tips.classList.add("hidden");
+        error_tips.classList.remove("hidden");
+    });
+
+    list_tips_event_target.addEventListener("end", () => {
+        loading_tips.classList.add("hidden");
+        end_tips.classList.remove("hidden");
+    });
+}
+
+
+// 初始化插件列表区域
+async function initPluginList(plugin_list, list_ctl) {
+    // 无网络先显示检查网络的tips
+    if (!(await plugins_marketplace.isOnline())) {
+        list_tips_event_target.dispatchEvent(list_tips_offline_event);
+        return;
+    }
+    // 有网络先显示正在加载的tips
+    else {
+        list_tips_event_target.dispatchEvent(list_tips_loading_event);
+    }
+
+    try {
+        const mirrorlist = await mergeMirrorlist(config.mirrorlist);
+        let mirrorlist_chunks = utils.groupArrayElements(mirrorlist, 10);
+
+        // 初始化界面
+        const current_page_text = list_ctl.querySelector(".current-page");
+        const total_page_text = list_ctl.querySelector(".total-page");
+        current_page_text.textContent = mirrorlist_chunks.length > 0 ? 1 : 0;
+        total_page_text.textContent = mirrorlist_chunks.length;
+
+
+        // 切换页面
+        const switchPage = async () => {
+            list_tips_event_target.dispatchEvent(list_tips_loading_event);
+            const current_page = parseInt(current_page_text.textContent) - 1;
+            const manifest_list = await getManifestList(mirrorlist_chunks[current_page]);
+            const fragment = getPluginListContentFragment(manifest_list);
+            plugin_list.innerHTML = "";
+            plugin_list.appendChild(fragment);
+            list_tips_event_target.dispatchEvent(list_tips_end_event);
+        }
+
+        // 触发上一页与下一页
+        list_ctl_event_target.addEventListener("previousPage", switchPage);
+        list_ctl_event_target.addEventListener("nextPage", switchPage);
+
+
+        // 列表排序
+        const triggerSortEvent = () => {
+            let sorted_list = [];
+
+            if (plugin_list.classList.contains("random")) {
+                sorted_list = utils.shuffleList(mirrorlist);
+            }
+            else if (plugin_list.classList.contains("sequence")) {
+                sorted_list = [...mirrorlist];
+            }
+
+            if (plugin_list.classList.contains("reverse")) {
+                sorted_list.reverse();
+            }
+
+            mirrorlist_chunks = utils.groupArrayElements(sorted_list, 10);
+            switchPage();
+        }
+
+        list_ctl_event_target.addEventListener("random", triggerSortEvent);
+        list_ctl_event_target.addEventListener("sequence", triggerSortEvent);
+        list_ctl_event_target.addEventListener("forward", triggerSortEvent);
+        list_ctl_event_target.addEventListener("reverse", triggerSortEvent);
+
+        // 初始化
+        triggerSortEvent();
+    }
+    // 加载报错显示对应tips
+    catch (error) {
+        list_tips_event_target.dispatchEvent(list_tips_error_event);
+    }
+}
+
+
 // 配置界面
 export async function onConfigView(view) {
     // CSS
@@ -458,7 +502,9 @@ export async function onConfigView(view) {
 
     // 初始化
     const list_ctl = view.querySelector(".list-ctl");
+    const list_tips = view.querySelector(".list-tips");
     const plugin_list = view.querySelector(".plugin-list");
     await initListCtl(list_ctl, plugin_list);
+    await initListTips(list_tips);
     await initPluginList(plugin_list, list_ctl);
 }

@@ -1,5 +1,5 @@
 // 运行在 Electron 主进程 下的插件入口
-const { ipcMain, app } = require("electron");
+const { ipcMain, app, net } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
@@ -174,6 +174,11 @@ async function restart() {
 }
 
 
+function isOnline() {
+    return net.online;
+}
+
+
 // 加载插件时触发
 function onLoad(plugin, liteloader) {
     ipcMain.handle(
@@ -205,6 +210,11 @@ function onLoad(plugin, liteloader) {
         "LiteLoader.plugins_marketplace.restart",
         (event, ...message) => restart()
     );
+
+    ipcMain.handle(
+        "LiteLoader.plugins_marketplace.isOnline",
+        (event, ...message) => isOnline()
+    )
 }
 
 
